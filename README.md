@@ -113,6 +113,31 @@ Tras cambiar el `.env`:
 php artisan config:clear && php artisan config:cache
 ```
 
+## Cómo se transmite el contenido de un cuscar
+
+El sistema legacy no enviaba desde PHP: descargaba el archivo en el navegador
+con `jQuery.get()` y posteaba desde el cliente, de modo que el navegador hacía
+por su cuenta dos transformaciones que aquí son explícitas.
+
+`App\Services\Sat\Support\CuscarContent` las reproduce:
+
+1. **Decodificación.** Los archivos que generan los sistemas de las navieras
+   vienen en UTF-16 con marca de orden de bytes. Se convierten a texto plano; sin
+   eso la SAT no logra leer ni el segmento `BGM`.
+2. **Saltos de línea.** Se eliminan los avances de línea y **se conservan los
+   retornos de carro**, igual que el `replace(/\n/g,"")` del legacy. La SAT usa
+   esos CR para numerar las líneas de sus mensajes de error; quitarlos dejaba el
+   cuscar en una sola línea y provocaba rechazos en archivos que antes pasaban.
+   Configurable con `SAT_CUSCAR_NEWLINE_MODE` (`solo_lf`, `todos`, `ninguno`).
+
+Cuando la SAT rechace un archivo, este comando dice exactamente qué se le
+transmitió y lo compara contra lo que envía otro sistema:
+
+```bash
+php artisan sat:inspeccionar-cuscar ruta/al/archivo.244
+php artisan sat:inspeccionar-cuscar ruta/al/archivo.244 --comparar=captura_legacy.txt
+```
+
 ## Estructura
 
 ```

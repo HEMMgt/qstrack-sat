@@ -2,21 +2,29 @@
 
 use App\Services\Sat\Support\CuscarContent;
 
-it('elimina los saltos de línea en todas sus variantes', function () {
-    // El sistema legacy solo quitaba \n, dejando los \r de un archivo CRLF.
+it('elimina los avances de línea y conserva los retornos de carro', function () {
+    // Reproduce el replace(/\n/g,"") del sistema legacy: la SAT usa los CR para
+    // numerar las líneas de sus mensajes de error, y quitarlos dejaba el cuscar
+    // en una sola línea.
     expect(CuscarContent::prepare("uno\ndos\r\ntres\rcuatro"))
-        ->toBe('unodostrescuatro');
+        ->toBe("unodos\rtres\rcuatro");
+});
+
+it('puede quitar todos los saltos si se configura así', function () {
+    config()->set('sat.cuscar.newline_mode', 'todos');
+
+    expect(CuscarContent::prepare("uno\ndos\r\ntres\rcuatro"))->toBe('unodostrescuatro');
+});
+
+it('puede transmitir el archivo tal cual', function () {
+    config()->set('sat.cuscar.newline_mode', 'ninguno');
+
+    expect(CuscarContent::prepare("uno\r\ndos"))->toBe("uno\r\ndos");
 });
 
 it('elimina el BOM al inicio del archivo', function () {
     expect(CuscarContent::prepare("\xEF\xBB\xBFUNB+UNOA"))
         ->toBe('UNB+UNOA');
-});
-
-it('conserva el contenido cuando strip_newlines está desactivado', function () {
-    config()->set('sat.cuscar.strip_newlines', false);
-
-    expect(CuscarContent::prepare("uno\ndos"))->toBe("uno\ndos");
 });
 
 it('deja intacto un contenido que ya viene en una sola línea', function () {
@@ -31,7 +39,7 @@ it('convierte un cuscar UTF-16 LE a texto plano', function () {
 
     $resultado = CuscarContent::prepare($utf16);
 
-    expect($resultado)->toBe("UNB+UNOA:2+740000000926'BGM+785+09E26007084+9'")
+    expect($resultado)->toBe("UNB+UNOA:2+740000000926'\rBGM+785+09E26007084+9'\r")
         ->and($resultado)->not->toContain("\x00");
 });
 
@@ -59,4 +67,19 @@ it('nunca deja pasar bytes nulos a la SAT', function () {
 it('deja intacto un archivo que ya viene en texto plano', function () {
     expect(CuscarContent::prepare("UNB+UNOA:2'\nBGM+785+1+9'"))
         ->toBe("UNB+UNOA:2'BGM+785+1+9'");
+});
+
+it('transmite los mismos bytes que el sistema legacy', function () {
+    // El legacy descarga el archivo en el navegador, lo decodifica por su marca
+    // de orden de bytes y le aplica replace(/\n/g,""). Esto reproduce esa cadena
+    // sobre un cuscar UTF-16 con saltos CRLF, que es el caso real.
+    $segmentos = "UNB+UNOA:2+740000000926+20260831:1220+7084+6'\r\n"
+        ."UNH+26007084+CUSCAR:D:01A:UN'\r\n"
+        ."BGM+785+09E26007084+9'\r\n"
+        ."UNZ+1+7084'\r\n";
+
+    $archivo = "\xFF\xFE".mb_convert_encoding($segmentos, 'UTF-16LE', 'UTF-8');
+    $legacy = str_replace("\n", '', $segmentos);
+
+    expect(CuscarContent::prepare($archivo))->toBe($legacy);
 });

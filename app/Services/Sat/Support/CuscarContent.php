@@ -24,16 +24,26 @@ final class CuscarContent
 
     public static function prepare(string $raw): string
     {
-        $content = self::toPlainText($raw);
+        return self::normalizeNewlines(self::toPlainText($raw));
+    }
 
-        if (config('sat.cuscar.strip_newlines')) {
-            // En EDIFACT el separador de segmentos es la comilla simple, no el
-            // salto de línea. El legacy solo quitaba \n, de modo que un archivo
-            // con CRLF conservaba los \r sueltos dentro del contenido enviado.
-            $content = str_replace(["\r\n", "\n", "\r"], '', $content);
-        }
-
-        return $content;
+    /**
+     * En EDIFACT el separador de segmentos es la comilla simple, no el salto de
+     * línea, pero la SAT sí usa los retornos de carro para numerar las líneas de
+     * sus mensajes de error.
+     *
+     * El modo por omisión reproduce exactamente lo que hace el sistema legacy:
+     * su replace(/\n/g,"") elimina los avances de línea y deja intactos los
+     * retornos de carro de un archivo CRLF. Quitarlos todos dejaba el cuscar en
+     * una sola línea y la SAT rechazaba archivos que antes aceptaba.
+     */
+    private static function normalizeNewlines(string $content): string
+    {
+        return match (config('sat.cuscar.newline_mode')) {
+            'todos' => str_replace(["\r\n", "\n", "\r"], '', $content),
+            'ninguno' => $content,
+            default => str_replace("\n", '', $content),
+        };
     }
 
     /**

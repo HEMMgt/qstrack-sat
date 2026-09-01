@@ -72,7 +72,7 @@ it('exige seleccionar un archivo', function () {
         ->assertSessionHasErrors('archivo');
 });
 
-it('transmite el contenido del disco sin saltos de línea', function () {
+it('transmite el contenido del disco igual que el sistema legacy', function () {
     Http::fake([
         SatFake::url('ingresarCuscar') => Http::response(SatFake::exito(
             ['firmaElectronica' => 'FIRMA-123', 'numeroManifiesto' => 'GT-777'],
@@ -91,10 +91,12 @@ it('transmite el contenido del disco sin saltos de línea', function () {
         ->post(route('sat.cuscar.send', $file))
         ->assertRedirect(route('sat.cuscar.validar.create', ['nombreArchivo' => 'P0011234.123']));
 
+    // Los avances de línea se eliminan y los retornos de carro se conservan,
+    // que es lo que hace el replace(/\n/g,"") del sistema legacy. La SAT usa
+    // esos CR para numerar las líneas de sus mensajes de error.
     Http::assertSent(fn ($request) => $request->url() === SatFake::url('ingresarCuscar')
-        && $request['contenidoArchivo'] === 'UNB+UNOAUNH+1UNT+2'
-        && ! str_contains($request['contenidoArchivo'], "\n")
-        && ! str_contains($request['contenidoArchivo'], "\r"));
+        && $request['contenidoArchivo'] === "UNB+UNOA\rUNH+1UNT+2"
+        && ! str_contains($request['contenidoArchivo'], "\n"));
 
     $file->refresh();
 
