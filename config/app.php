@@ -65,7 +65,11 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    // El sistema opera únicamente ante la SAT de Guatemala: las fechas que
+    // devuelve el servicio vienen en hora local, así que guardar y mostrar en
+    // UTC dejaba los registros seis horas adelantados frente a lo que reporta
+    // la SAT. Configurable por si alguna vez hiciera falta otra zona.
+    'timezone' => env('APP_TIMEZONE', 'America/Guatemala'),
 
     /*
     |--------------------------------------------------------------------------

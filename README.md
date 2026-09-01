@@ -89,6 +89,10 @@ del proyecto: de lo contrario quedan expuestos el `.env` y todo el código.
 termina el TLS la petición llega a PHP como http plano y el navegador bloquea
 los assets http dentro de una página segura: la aplicación se ve sin estilos.
 
+La aplicación opera en `America/Guatemala`, no en UTC: la SAT devuelve las
+fechas en hora local y guardar en UTC deja los registros propios seis horas
+adelantados frente a lo que reporta el servicio para la misma operación.
+
 Permisos, una sola vez y con el usuario propietario del código:
 
 ```bash
