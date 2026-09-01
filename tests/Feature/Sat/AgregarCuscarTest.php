@@ -91,12 +91,17 @@ it('transmite el contenido del disco igual que el sistema legacy', function () {
         ->post(route('sat.cuscar.send', $file))
         ->assertRedirect(route('sat.cuscar.validar.create', ['nombreArchivo' => 'P0011234.123']));
 
-    // Los avances de línea se eliminan y los retornos de carro se conservan,
-    // que es lo que hace el replace(/\n/g,"") del sistema legacy. La SAT usa
-    // esos CR para numerar las líneas de sus mensajes de error.
-    Http::assertSent(fn ($request) => $request->url() === SatFake::url('ingresarCuscar')
-        && $request['contenidoArchivo'] === "UNB+UNOA\rUNH+1UNT+2"
-        && ! str_contains($request['contenidoArchivo'], "\n"));
+    // La cadena del navegador del legacy transmite los CRLF intactos; el LF
+    // suelto desaparece en su replace(/\n/g,"") y no se recupera. La SAT usa
+    // esos saltos para numerar las líneas de sus mensajes de error.
+    Http::assertSent(function ($request) {
+        $contenido = $request['contenidoArchivo'];
+
+        return $request->url() === SatFake::url('ingresarCuscar')
+            && $contenido === "UNB+UNOA\r\nUNH+1UNT+2"
+            // Ningún CR suelto: siempre como parte de un CRLF.
+            && ! preg_match('/\r(?!\n)/', $contenido);
+    });
 
     $file->refresh();
 

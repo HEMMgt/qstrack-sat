@@ -28,21 +28,29 @@ final class CuscarContent
     }
 
     /**
-     * En EDIFACT el separador de segmentos es la comilla simple, no el salto de
-     * línea, pero la SAT sí usa los retornos de carro para numerar las líneas de
-     * sus mensajes de error.
+     * El modo por omisión reproduce la cadena completa del navegador en el
+     * sistema legacy, cuyos tres pasos se anulan entre sí:
      *
-     * El modo por omisión reproduce exactamente lo que hace el sistema legacy:
-     * su replace(/\n/g,"") elimina los avances de línea y deja intactos los
-     * retornos de carro de un archivo CRLF. Quitarlos todos dejaba el cuscar en
-     * una sola línea y la SAT rechazaba archivos que antes aceptaba.
+     *   1. replace(/\n/g,"") elimina los avances de línea; de un archivo CRLF
+     *      quedan retornos de carro sueltos.
+     *   2. jQuery('#contenidoArchivo').html(data) pasa por el parser HTML, que
+     *      normaliza cada retorno de carro suelto a un avance de línea
+     *      (HTML Standard, preprocesado del flujo de entrada).
+     *   3. serializeArray() de jQuery convierte cada avance de línea en CRLF
+     *      (value.replace(/\r?\n/g, "\r\n")).
+     *
+     * Neto: un archivo CRLF viaja a la SAT con sus saltos intactos. Una
+     * simulación que se detenía en el paso 1 nos hizo transmitir retornos de
+     * carro sueltos, que el analizador de la SAT no reconoce como separador de
+     * línea, y rechazaba con errores de lexema y de segmento de cabecera.
      */
     private static function normalizeNewlines(string $content): string
     {
         return match (config('sat.cuscar.newline_mode')) {
             'todos' => str_replace(["\r\n", "\n", "\r"], '', $content),
             'ninguno' => $content,
-            default => str_replace("\n", '', $content),
+            // 'crlf' y cualquier valor heredado ('solo_lf') caen aquí.
+            default => str_replace("\r", "\r\n", str_replace("\n", '', $content)),
         };
     }
 

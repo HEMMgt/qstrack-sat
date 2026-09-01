@@ -71,12 +71,12 @@ return [
         'disk' => 'cuscar',
         'max_bytes' => (int) env('SAT_CUSCAR_MAX_BYTES', 1_240_000),
         // Cómo tratar los saltos de línea antes de transmitir:
-        //   solo_lf  quita los LF y conserva los CR — es lo que hace el sistema
-        //            legacy en producción con su replace(/\n/g,"") y lo que la
-        //            SAT viene aceptando desde hace años.
+        //   crlf     reproduce la cadena del navegador del sistema legacy, cuyo
+        //            efecto neto es transmitir un archivo CRLF con sus saltos
+        //            intactos: es lo que la SAT viene aceptando desde hace años.
         //   todos    quita CRLF, LF y CR, dejando los segmentos pegados.
         //   ninguno  transmite el archivo tal cual.
-        'newline_mode' => env('SAT_CUSCAR_NEWLINE_MODE', 'solo_lf'),
+        'newline_mode' => env('SAT_CUSCAR_NEWLINE_MODE', 'crlf'),
         'service_types' => ['P', 'E'],
         'procesamiento_sincrono' => env('SAT_PROCESAMIENTO_SINCRONO', false) ? 'true' : 'false',
         // La SAT no valida al instante; este es el tiempo que se le indica al

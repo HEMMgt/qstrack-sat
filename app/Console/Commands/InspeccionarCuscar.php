@@ -99,17 +99,29 @@ class InspeccionarCuscar extends Command
     }
 
     /**
-     * Reproduce lo que transmitiría el sistema legacy.
+     * Reproduce lo que transmitiría el sistema legacy, cuya petición la arma el
+     * navegador en tres pasos que se anulan entre sí:
      *
-     * Su envío lo hace el navegador: descarga el archivo, lo decodifica por su
-     * marca de orden de bytes y le aplica replace(/\n/g,""), que elimina los
-     * avances de línea y conserva los retornos de carro. El recorte de dos
-     * caracteres del legacy no se replica: solo se aplicaba en Firefox, y los
-     * envíos en producción se hacen desde Chrome.
+     *   1. replace(/\n/g,"") sobre el texto descargado — quedan CR sueltos.
+     *   2. .html() sobre el textarea — el parser HTML normaliza CR suelto a LF.
+     *   3. serializeArray() de jQuery — cada LF vuelve a ser CRLF.
+     *
+     * Neto: un archivo CRLF viaja con sus saltos intactos. Una versión anterior
+     * de esta simulación se detenía en el paso 1 y validó como "idéntica" una
+     * transmisión con CR sueltos que la SAT rechazaba.
+     *
+     * El recorte de dos caracteres del legacy no se replica: solo se aplicaba
+     * en Firefox, y los envíos en producción se hacen desde Chrome.
      */
     private function comoLegacy(string $crudo): string
     {
-        return str_replace("\n", '', CuscarContent::toPlainText($crudo));
+        $texto = CuscarContent::toPlainText($crudo);
+
+        $paso1 = str_replace("\n", '', $texto);          // replace(/\n/g,"")
+        $paso2 = str_replace("\r", "\n", $paso1);        // parser HTML: CR -> LF
+        $paso3 = str_replace("\n", "\r\n", $paso2);      // serializeArray: LF -> CRLF
+
+        return $paso3;
     }
 
     private function comparar(string $transmitido, string $otro, string $etiqueta): int

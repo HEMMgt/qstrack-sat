@@ -141,11 +141,15 @@ por su cuenta dos transformaciones que aquí son explícitas.
 1. **Decodificación.** Los archivos que generan los sistemas de las navieras
    vienen en UTF-16 con marca de orden de bytes. Se convierten a texto plano; sin
    eso la SAT no logra leer ni el segmento `BGM`.
-2. **Saltos de línea.** Se eliminan los avances de línea y **se conservan los
-   retornos de carro**, igual que el `replace(/\n/g,"")` del legacy. La SAT usa
-   esos CR para numerar las líneas de sus mensajes de error; quitarlos dejaba el
-   cuscar en una sola línea y provocaba rechazos en archivos que antes pasaban.
-   Configurable con `SAT_CUSCAR_NEWLINE_MODE` (`solo_lf`, `todos`, `ninguno`).
+2. **Saltos de línea.** Un archivo CRLF se transmite **con sus saltos intactos**.
+   El `replace(/\n/g,"")` del legacy parece eliminarlos, pero el navegador lo
+   deshace: meter el texto al textarea con `.html()` hace que el parser HTML
+   convierta cada CR suelto en LF, y `serializeArray()` de jQuery los devuelve
+   como CRLF. La cadena completa se anula a sí misma, así que lo que la SAT
+   recibe del sistema viejo es el archivo decodificado sin cambios — y su
+   analizador cuenta esas líneas; sin ellas (o con CR sueltos) rechaza con
+   errores de lexema y de segmento de cabecera. Configurable con
+   `SAT_CUSCAR_NEWLINE_MODE` (`crlf`, `todos`, `ninguno`).
 
 Cuando la SAT rechace un archivo, este comando dice exactamente qué se le
 transmitió y lo compara contra lo que envía otro sistema:

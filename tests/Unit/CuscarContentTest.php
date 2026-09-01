@@ -2,12 +2,21 @@
 
 use App\Services\Sat\Support\CuscarContent;
 
-it('elimina los avances de línea y conserva los retornos de carro', function () {
-    // Reproduce el replace(/\n/g,"") del sistema legacy: la SAT usa los CR para
-    // numerar las líneas de sus mensajes de error, y quitarlos dejaba el cuscar
-    // en una sola línea.
+it('reproduce la cadena del navegador: los CRLF sobreviven y los LF sueltos no', function () {
+    // El legacy quita los LF (replace(/\n/g,"")), el parser HTML del textarea
+    // convierte los CR sueltos en LF, y serializeArray() los devuelve como CRLF.
+    // Neto: CRLF intacto, LF suelto eliminado, CR suelto promovido a CRLF.
     expect(CuscarContent::prepare("uno\ndos\r\ntres\rcuatro"))
-        ->toBe("unodos\rtres\rcuatro");
+        ->toBe("unodos\r\ntres\r\ncuatro");
+});
+
+it('transmite un archivo CRLF byte a byte igual que lo decodifica', function () {
+    // La cadena completa del navegador se anula a sí misma para archivos CRLF:
+    // lo que la SAT recibe del legacy es el archivo decodificado sin cambios.
+    $segmentos = "UNB+UNOA:2+740000000926'\r\nBGM+785+1+9'\r\nUNZ+1+1'\r\n";
+    $archivo = "\xFF\xFE".mb_convert_encoding($segmentos, 'UTF-16LE', 'UTF-8');
+
+    expect(CuscarContent::prepare($archivo))->toBe($segmentos);
 });
 
 it('puede quitar todos los saltos si se configura así', function () {
@@ -39,7 +48,7 @@ it('convierte un cuscar UTF-16 LE a texto plano', function () {
 
     $resultado = CuscarContent::prepare($utf16);
 
-    expect($resultado)->toBe("UNB+UNOA:2+740000000926'\rBGM+785+09E26007084+9'\r")
+    expect($resultado)->toBe("UNB+UNOA:2+740000000926'\r\nBGM+785+09E26007084+9'\r\n")
         ->and($resultado)->not->toContain("\x00");
 });
 
@@ -70,16 +79,20 @@ it('deja intacto un archivo que ya viene en texto plano', function () {
 });
 
 it('transmite los mismos bytes que el sistema legacy', function () {
-    // El legacy descarga el archivo en el navegador, lo decodifica por su marca
-    // de orden de bytes y le aplica replace(/\n/g,""). Esto reproduce esa cadena
-    // sobre un cuscar UTF-16 con saltos CRLF, que es el caso real.
+    // La cadena real del navegador: replace(/\n/g,"") deja CR sueltos, el
+    // parser HTML del textarea los convierte en LF y serializeArray() los
+    // devuelve como CRLF. Se recorre paso a paso sobre un cuscar UTF-16.
     $segmentos = "UNB+UNOA:2+740000000926+20260831:1220+7084+6'\r\n"
         ."UNH+26007084+CUSCAR:D:01A:UN'\r\n"
         ."BGM+785+09E26007084+9'\r\n"
         ."UNZ+1+7084'\r\n";
 
     $archivo = "\xFF\xFE".mb_convert_encoding($segmentos, 'UTF-16LE', 'UTF-8');
-    $legacy = str_replace("\n", '', $segmentos);
 
-    expect(CuscarContent::prepare($archivo))->toBe($legacy);
+    $paso1 = str_replace("\n", '', $segmentos);   // replace(/\n/g,"")
+    $paso2 = str_replace("\r", "\n", $paso1);     // parser HTML: CR -> LF
+    $legacy = str_replace("\n", "\r\n", $paso2);  // serializeArray: LF -> CRLF
+
+    expect(CuscarContent::prepare($archivo))->toBe($legacy)
+        ->and($legacy)->toBe($segmentos);
 });
