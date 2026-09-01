@@ -30,19 +30,25 @@ Usuarios del seeder (contraseña `password`): `admin@qstrack.test`,
 
 ## Ambiente de la SAT
 
-Se elige con dos variables de entorno, **nunca editando código**:
-
 ```dotenv
-# Pruebas (valor por omisión)
-SAT_ENVIRONMENT=pruebas
-SAT_BASE_URL=https://prefarm3.sat.gob.gt/manifiestos/rest/receptorCuscar/
-
-# Producción
 SAT_ENVIRONMENT=produccion
 SAT_BASE_URL=https://farm3.sat.gob.gt/manifiestos/rest/receptorCuscar/
 ```
 
-Tras cambiarlas: `php artisan config:clear`.
+**La SAT solo tiene `farm3` accesible.** El host `prefarm3` aparece en los
+formularios de ejemplo que la SAT entregó (guardados como `sat/*.html` en el
+sistema legacy), pero responde 403 y el código en operación nunca lo usó: los
+nueve puntos donde el sistema anterior tenía la URL escrita a mano apuntan todos
+a farm3.
+
+La URL sigue siendo una variable de entorno y no una constante en el código, de
+modo que si la SAT habilita un ambiente de pruebas basta con cambiarla. Tras
+modificarla: `php artisan config:clear`.
+
+Como no hay ambiente de pruebas, **toda operación es real**. `validarNit` y
+`consultarEncabezadoManifiesto` son consultas de solo lectura, pero
+`ingresarCuscar` da de alta un manifiesto: por eso el envío pide confirmación,
+nunca se reintenta solo, y un reenvío exige marcar una casilla.
 
 ## Decisiones de diseño
 

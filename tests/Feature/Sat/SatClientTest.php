@@ -38,8 +38,11 @@ it('envía usuario, contraseña y respuestaXml al endpoint correcto', function (
     });
 });
 
-it('usa el ambiente de pruebas cuando no se configura otro', function () {
-    expect(config('sat.base_url'))->toContain('prefarm3.sat.gob.gt');
+it('usa la URL del entorno y siempre termina en barra', function () {
+    // La SAT solo tiene farm3 accesible; prefarm3, que aparece en sus
+    // formularios de ejemplo, responde 403.
+    expect(config('sat.base_url'))
+        ->toBe('https://farm3.sat.gob.gt/manifiestos/rest/receptorCuscar/');
 });
 
 it('envía procesamientoSincrono en false al ingresar un cuscar', function () {

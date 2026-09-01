@@ -32,8 +32,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
-        <env name="SAT_BASE_URL" value="https://prefarm3.sat.gob.gt/manifiestos/rest/receptorCuscar/"/>
-        <env name="SAT_ENVIRONMENT" value="pruebas"/>
+        <env name="SAT_BASE_URL" value="https://farm3.sat.gob.gt/manifiestos/rest/receptorCuscar/"/>
+        <env name="SAT_ENVIRONMENT" value="produccion"/>
         <env name="SAT_RETRY_TIMES" value="2"/>
         <env name="SAT_RETRY_SLEEP_MS" value="0"/>
     </php>

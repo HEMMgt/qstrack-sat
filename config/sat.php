@@ -7,21 +7,26 @@ return [
     | Ambiente
     |--------------------------------------------------------------------------
     |
-    | El valor por omisión de base_url apunta a PRE-PRODUCCIÓN. Un .env sin la
-    | variable jamás golpea el ambiente real de la SAT. Cambiar de ambiente es
-    | una variable de entorno, nunca una edición de código: en el sistema legacy
-    | la URL estaba escrita a mano en nueve lugares distintos.
+    | La SAT solo tiene un ambiente accesible: farm3. El host prefarm3 que
+    | aparece en los formularios de ejemplo entregados por la SAT (sat/*.html
+    | del sistema legacy) responde 403 y nunca fue usado por el código en
+    | producción, que siempre habló con farm3.
+    |
+    | Cambiar de ambiente sigue siendo una variable de entorno y nunca una
+    | edición de código: en el sistema legacy la URL estaba escrita a mano en
+    | nueve lugares distintos.
     |
     */
 
-    'environment' => env('SAT_ENVIRONMENT', 'pruebas'),
+    'environment' => env('SAT_ENVIRONMENT', 'produccion'),
 
     'base_url' => rtrim(env(
         'SAT_BASE_URL',
-        'https://prefarm3.sat.gob.gt/manifiestos/rest/receptorCuscar/',
+        'https://farm3.sat.gob.gt/manifiestos/rest/receptorCuscar/',
     ), '/').'/',
 
-    'production_url' => 'https://farm3.sat.gob.gt/manifiestos/rest/receptorCuscar/',
+    // Documentado por la SAT pero inaccesible: devuelve 403.
+    'preproduction_url' => 'https://prefarm3.sat.gob.gt/manifiestos/rest/receptorCuscar/',
 
     /*
     |--------------------------------------------------------------------------
