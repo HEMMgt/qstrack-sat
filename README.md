@@ -113,6 +113,23 @@ Tras cambiar el `.env`:
 php artisan config:clear && php artisan config:cache
 ```
 
+## El emisor debe corresponder a la credencial
+
+La SAT exige que el emisor declarado en el segmento `UNB` del cuscar sea la
+empresa con cuyas credenciales se transmite. Enviar un manifiesto de una empresa
+autenticado como otra provoca un rechazo en el segmento de cabecera cuyo mensaje
+no explica la causa real.
+
+`App\Services\Sat\Support\CuscarHeader` lee ese emisor al cargar el archivo y
+se guarda en `cuscar_files.emisor`. La pantalla de revisión lo muestra junto a la
+credencial que se usará, para que ambos datos se vean antes de transmitir.
+
+Cada credencial puede llevar su **código de emisor (GLN)**, el que la SAT publica
+en sus manifiestos. Cuando está capturado, el sistema impide transmitir archivos
+de otro emisor. Y aunque la credencial asignada no lo tenga, si el emisor del
+archivo corresponde a otra credencial registrada, el envío también se detiene
+indicando cuál es la correcta.
+
 ## Cómo se transmite el contenido de un cuscar
 
 El sistema legacy no enviaba desde PHP: descargaba el archivo en el navegador

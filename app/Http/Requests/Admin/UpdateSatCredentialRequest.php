@@ -21,11 +21,23 @@ class UpdateSatCredentialRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:120'],
             'nit' => ['required', 'string', 'max:20', 'regex:/^[0-9A-Za-z\-]+$/'],
+            'gln' => ['nullable', 'string', 'max:35', 'regex:/^[0-9A-Za-z\-]+$/'],
             // Vacío = conservar la contraseña actual.
             'password' => ['nullable', 'string', 'max:100'],
             'environment' => ['required', Rule::in(['pruebas', 'produccion'])],
             'is_active' => ['boolean'],
             'notes' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'nit.regex' => 'El NIT solo puede contener números, letras y guiones.',
+            'gln.regex' => 'El código de emisor solo puede contener números, letras y guiones.',
         ];
     }
 

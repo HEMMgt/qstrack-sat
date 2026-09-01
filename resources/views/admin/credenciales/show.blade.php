@@ -14,6 +14,12 @@
                         <dd class="font-mono text-gray-900">{{ $credential->nit }}</dd>
                     </div>
                     <div>
+                        <dt class="text-xs uppercase tracking-wide text-gray-500">Código de emisor (GLN)</dt>
+                        <dd class="font-mono text-gray-900">
+                            {{ $credential->gln ?: '— sin capturar: no se valida el emisor de los cuscar' }}
+                        </dd>
+                    </div>
+                    <div>
                         <dt class="text-xs uppercase tracking-wide text-gray-500">Contraseña</dt>
                         <dd class="text-gray-400">•••••••• <span class="text-xs">(cifrada, no se muestra)</span></dd>
                     </div>

@@ -214,3 +214,163 @@ it('muestra la vista previa legible aunque el archivo sea UTF-16', function () {
         ->assertOk()
         ->assertSee('BGM+785+1+9');
 });
+
+/**
+ * Cuscar de Correo Directo: el emisor va en el tercer elemento del UNB.
+ */
+function cuscarDeEmisor(string $emisor): string
+{
+    $segmentos = "UNB+UNOA:2+{$emisor}+7409000030025+20260901:0837+0577+6'\r\n"
+        ."UNH+26000477+CUSCAR:D:01A:UN'\r\n"
+        ."BGM+785+21C26000477+9'\r\n"
+        ."UNZ+1+0577'\r\n";
+
+    return "\xFF\xFE".mb_convert_encoding($segmentos, 'UTF-16LE', 'UTF-8');
+}
+
+function operadorConGln(?string $gln): App\Models\User
+{
+    $user = User::factory()->operador()->create();
+    SatCredential::factory()->create(['name' => 'Correo Directo, S.A.', 'gln' => $gln])
+        ->users()->attach($user, ['assigned_at' => now()]);
+
+    return $user;
+}
+
+it('guarda el emisor y el manifiesto declarados en el archivo', function () {
+    $this->actingAs(operadorConGln(null))->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent(
+            'P0011234.123', cuscarDeEmisor('7400000000926'),
+        ),
+    ]);
+
+    $file = CuscarFile::sole();
+
+    expect($file->emisor)->toBe('7400000000926')
+        ->and($file->numero_manifiesto_declarado)->toBe('21C26000477');
+});
+
+it('transmite cuando el emisor corresponde a la credencial', function () {
+    Http::fake([SatFake::url('ingresarCuscar') => Http::response(SatFake::exito())]);
+
+    $user = operadorConGln('7400000000926');
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent(
+            'P0011234.123', cuscarDeEmisor('7400000000926'),
+        ),
+    ]);
+
+    $this->actingAs($user)->post(route('sat.cuscar.send', CuscarFile::sole()))
+        ->assertSessionMissing('sat_error');
+
+    expect(CuscarFile::sole()->status)->toBe(CuscarStatus::Enviado);
+});
+
+it('no transmite un archivo de otro emisor', function () {
+    Http::fake([SatFake::url('ingresarCuscar') => Http::response(SatFake::exito())]);
+
+    // Es lo que ocurrió en producción: manifiestos de Correo Directo enviados
+    // con la credencial de otra empresa. La SAT los rechazaba en el segmento UNB
+    // con un mensaje que no explicaba la causa.
+    $user = operadorConGln('28593111');
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent(
+            'P0011234.123', cuscarDeEmisor('7400000000926'),
+        ),
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('sat.cuscar.send', CuscarFile::sole()))
+        ->assertSessionHas('sat_error');
+
+    // Ni siquiera se intenta: no se gasta un envío para que la SAT lo rechace.
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'ingresarCuscar'));
+
+    expect(CuscarFile::sole()->status)->toBe(CuscarStatus::Cargado);
+});
+
+it('el mensaje nombra el emisor del archivo y la credencial asignada', function () {
+    $user = operadorConGln('28593111');
+    $credencial = $user->satCredential();
+
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent(
+            'P0011234.123', cuscarDeEmisor('7400000000926'),
+        ),
+    ]);
+
+    $this->actingAs($user)->post(route('sat.cuscar.send', CuscarFile::sole()));
+
+    expect(session('sat_error'))
+        ->toContain('7400000000926')
+        ->toContain($credencial->label());
+});
+
+it('no restringe nada mientras la credencial no tenga código de emisor', function () {
+    Http::fake([SatFake::url('ingresarCuscar') => Http::response(SatFake::exito())]);
+
+    $user = operadorConGln(null);
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent(
+            'P0011234.123', cuscarDeEmisor('7400000000926'),
+        ),
+    ]);
+
+    $this->actingAs($user)->post(route('sat.cuscar.send', CuscarFile::sole()));
+
+    expect(CuscarFile::sole()->status)->toBe(CuscarStatus::Enviado);
+});
+
+it('avisa en la pantalla de revisión antes de transmitir', function () {
+    $user = operadorConGln('28593111');
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent(
+            'P0011234.123', cuscarDeEmisor('7400000000926'),
+        ),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('sat.cuscar.show', CuscarFile::sole()))
+        ->assertOk()
+        ->assertSee('El emisor del archivo no corresponde a su credencial')
+        ->assertSee('7400000000926');
+});
+
+it('detecta la credencial equivocada aunque la asignada no tenga código de emisor', function () {
+    Http::fake([SatFake::url('ingresarCuscar') => Http::response(SatFake::exito())]);
+
+    // El escenario exacto que se dio en producción: al operador se le asignó la
+    // credencial de otra empresa, que además no tenía código capturado. Como sí
+    // existe registrada la credencial del emisor del archivo, el sistema sabe
+    // que la asignada no es la que corresponde.
+    SatCredential::factory()->create(['name' => 'Correo Directo, S.A.', 'gln' => '7400000000926']);
+
+    $user = operadorConGln(null);
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent(
+            'P0011234.123', cuscarDeEmisor('7400000000926'),
+        ),
+    ]);
+
+    $this->actingAs($user)->post(route('sat.cuscar.send', CuscarFile::sole()));
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'ingresarCuscar'));
+
+    expect(session('sat_error'))->toContain('corresponde a Correo Directo, S.A.')
+        ->and(CuscarFile::sole()->status)->toBe(CuscarStatus::Cargado);
+});
+
+it('transmite cuando ninguna credencial reclama ese emisor', function () {
+    Http::fake([SatFake::url('ingresarCuscar') => Http::response(SatFake::exito())]);
+
+    $user = operadorConGln(null);
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent(
+            'P0011234.123', cuscarDeEmisor('9999999999999'),
+        ),
+    ]);
+
+    $this->actingAs($user)->post(route('sat.cuscar.send', CuscarFile::sole()));
+
+    expect(CuscarFile::sole()->status)->toBe(CuscarStatus::Enviado);
+});

@@ -23,6 +23,7 @@ class SatCredential extends Model
     protected $fillable = [
         'name',
         'nit',
+        'gln',
         'password',
         'environment',
         'is_active',
@@ -67,5 +68,36 @@ class SatCredential extends Model
     public function label(): string
     {
         return "{$this->name} ({$this->nit})";
+    }
+
+    /**
+     * Comprueba que el cuscar corresponde a esta empresa.
+     *
+     * Se rechaza en dos casos: cuando esta credencial declara un emisor
+     * distinto, y cuando el emisor del archivo pertenece a otra credencial
+     * registrada. Lo segundo cubre el caso real que se dio en producción, donde
+     * la credencial en uso no tenía código capturado pero sí lo tenía la que
+     * correspondía al archivo.
+     */
+    public function admiteEmisor(?string $emisor): bool
+    {
+        if (blank($emisor)) {
+            return true;
+        }
+
+        if (filled($this->gln)) {
+            return strcasecmp(trim($this->gln), trim($emisor)) === 0;
+        }
+
+        return ! self::deEmisor($emisor, exceptoId: $this->id) instanceof self;
+    }
+
+    /** Credencial registrada para ese código de emisor, si existe alguna. */
+    public static function deEmisor(string $emisor, ?int $exceptoId = null): ?self
+    {
+        return self::query()
+            ->whereRaw('LOWER(gln) = ?', [mb_strtolower(trim($emisor))])
+            ->when($exceptoId, fn ($q) => $q->whereKeyNot($exceptoId))
+            ->first();
     }
 }

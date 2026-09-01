@@ -17,6 +17,18 @@
     </div>
 
     <div>
+        <x-input-label for="gln" value="Código de emisor (GLN)" />
+        <x-text-input id="gln" name="gln" type="text" class="mt-1 block w-full font-mono"
+                      value="{{ old('gln', $credential?->gln) }}" maxlength="35" />
+        <p class="mt-1 text-xs text-gray-500">
+            Opcional. Es el código que la SAT muestra como «Emisor (GLN)» en sus manifiestos
+            y el que va en el segmento <code>UNB</code> de los cuscar de esta empresa.
+            Si lo captura, el sistema impedirá transmitir archivos de otro emisor con esta credencial.
+        </p>
+        <x-input-error :messages="$errors->get('gln')" class="mt-2" />
+    </div>
+
+    <div>
         <x-input-label for="password"
                        :value="$credential ? 'Nueva contraseña SAT (vacío = sin cambio)' : 'Contraseña SAT'" />
         <x-text-input id="password" name="password" type="password" class="mt-1 block w-full"

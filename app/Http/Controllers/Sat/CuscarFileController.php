@@ -6,16 +6,19 @@ use App\Enums\CuscarStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Sat\StoreCuscarFileRequest;
 use App\Models\CuscarFile;
+use App\Models\SatCredential;
 use App\Rules\CuscarFileName;
 use App\Services\Sat\Exceptions\SatException;
 use App\Services\Sat\SatClientFactory;
 use App\Services\Sat\Support\CuscarContent;
+use App\Services\Sat\Support\CuscarHeader;
+use App\Support\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use App\Support\AuditLogger;
 
 /**
  * Alta y envío de archivos cuscar, en los tres pasos del sistema original:
@@ -59,6 +62,10 @@ class CuscarFileController extends Controller
             config('sat.cuscar.disk'),
         );
 
+        $cabecera = CuscarHeader::fromContent(
+            Storage::disk(config('sat.cuscar.disk'))->get($path),
+        );
+
         $file = CuscarFile::create([
             'user_id' => $user->id,
             'sat_credential_id' => $user->satCredential()->id,
@@ -67,6 +74,8 @@ class CuscarFileController extends Controller
             'sha256' => hash_file('sha256', $upload->getRealPath() ?: $upload->getPathname()),
             'storage_path' => $path,
             'status' => CuscarStatus::Cargado,
+            'emisor' => $cabecera->emisor,
+            'numero_manifiesto_declarado' => $cabecera->numeroManifiesto,
         ] + CuscarFileName::parse($name));
 
         AuditLogger::log('sat.cuscar.cargado', $file, "Se cargó el archivo {$file->filename}", [
@@ -104,6 +113,9 @@ class CuscarFileController extends Controller
             'file' => $cuscar,
             'preview' => $preview,
             'missing' => $missing,
+            // La credencial con la que se transmitirá, para que el operador vea
+            // el emisor del archivo y la empresa emisora una al lado de la otra.
+            'credencial' => request()->user()->satCredential(),
         ]);
     }
 
@@ -125,6 +137,25 @@ class CuscarFileController extends Controller
                 'sat_error',
                 'Este archivo ya fue transmitido. Marque la casilla de reenvío si realmente desea repetirlo.',
             );
+        }
+
+        $credencial = $request->user()->satCredential();
+
+        // La SAT exige que el emisor declarado en el UNB corresponda a la
+        // empresa con cuyas credenciales se transmite. Enviarlo de todas formas
+        // provoca un rechazo en el segmento de cabecera que no dice cuál es el
+        // problema real.
+        if (! $credencial->admiteEmisor($cuscar->emisor)) {
+            $correcta = SatCredential::deEmisor($cuscar->emisor, exceptoId: $credencial->id);
+
+            return back()->with('sat_error', sprintf(
+                'El archivo declara el emisor %s y usted transmite como %s. %s',
+                $cuscar->emisor,
+                $credencial->label(),
+                $correcta
+                    ? "Ese emisor corresponde a {$correcta->name}: solicite esa credencial."
+                    : 'La SAT lo rechazaría: solicite la credencial que corresponde a ese emisor.',
+            ));
         }
 
         // Lo que se envía es el archivo en disco, no lo que mande el navegador:

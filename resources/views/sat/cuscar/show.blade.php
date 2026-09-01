@@ -54,6 +54,46 @@
             </div>
 
             <div class="bg-white p-6 shadow sm:rounded-lg">
+                <h3 class="mb-4 text-base font-semibold text-gray-900">Cabecera del archivo</h3>
+
+                @php($coincide = $credencial?->admiteEmisor($file->emisor) ?? true)
+
+                @unless ($coincide)
+                    {{-- Enviarlo así provoca un rechazo en el segmento UNB que no
+                         explica cuál es el problema real. --}}
+                    <div class="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        <strong>El emisor del archivo no corresponde a su credencial.</strong>
+                        La SAT rechazaría este manifiesto. Solicite a un administrador la
+                        credencial de la empresa emisora.
+                    </div>
+                @endunless
+
+                <dl class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <dt class="text-xs uppercase tracking-wide text-gray-500">Emisor declarado en el archivo</dt>
+                        <dd @class([
+                            'font-mono',
+                            'text-gray-900' => $coincide,
+                            'font-semibold text-red-700' => ! $coincide,
+                        ])>{{ $file->emisor ?? '—' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs uppercase tracking-wide text-gray-500">Se transmitirá como</dt>
+                        <dd class="text-gray-900">
+                            {{ $credencial?->label() ?? 'Sin credencial asignada' }}
+                            @if ($credencial?->gln)
+                                <span class="block font-mono text-xs text-gray-500">Emisor: {{ $credencial->gln }}</span>
+                            @endif
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs uppercase tracking-wide text-gray-500">Número de manifiesto declarado</dt>
+                        <dd class="font-mono text-gray-900">{{ $file->numero_manifiesto_declarado ?? '—' }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div class="bg-white p-6 shadow sm:rounded-lg">
                 <h3 class="mb-3 text-base font-semibold text-gray-900">Contenido</h3>
 
                 @if ($missing)
@@ -94,7 +134,7 @@
                             </label>
                         @endif
 
-                        <x-primary-button :disabled="$missing">Transmitir cuscar</x-primary-button>
+                        <x-primary-button :disabled="$missing || ! $coincide">Transmitir cuscar</x-primary-button>
                         <a href="{{ route('sat.cuscar.create') }}" class="ms-3 text-sm text-gray-600 hover:underline">
                             Cambiar archivo
                         </a>

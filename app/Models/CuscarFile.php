@@ -28,6 +28,8 @@ class CuscarFile extends Model
         'service_type',
         'correlativo',
         'julian_extension',
+        'emisor',
+        'numero_manifiesto_declarado',
         'size_bytes',
         'sha256',
         'storage_path',
