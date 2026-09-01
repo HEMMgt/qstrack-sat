@@ -78,6 +78,37 @@ autenticada con su política.
 **La autorización está en las rutas, no en el menú.** El menú usa `@can` solo
 para no mostrar lo que no se puede usar; quien escriba la URL a mano recibe 403.
 
+## Despliegue
+
+El `DocumentRoot` del servidor web debe apuntar a **`public/`**, nunca a la raíz
+del proyecto: de lo contrario quedan expuestos el `.env` y todo el código.
+
+`APP_URL` tiene que llevar el esquema real con el que se sirve el sitio. Si es
+`https://`, la aplicación fuerza ese esquema en todos los enlaces y assets
+(`AppServiceProvider::forceHttpsWhenConfigured`), porque tras un proxy o CDN que
+termina el TLS la petición llega a PHP como http plano y el navegador bloquea
+los assets http dentro de una página segura: la aplicación se ve sin estilos.
+
+Permisos, una sola vez y con el usuario propietario del código:
+
+```bash
+sudo chown -R $USER:www-data storage bootstrap/cache
+sudo chmod -R 775 storage bootstrap/cache
+sudo find storage bootstrap/cache -type d -exec chmod g+s {} \;
+sudo chmod 755 .          # el servidor web debe poder atravesar el directorio
+```
+
+**Nunca ejecutes `artisan`, `composer` ni `npm` con `sudo`.** Los archivos que
+generen quedarán como root y ni el servidor web ni tu usuario podrán
+reescribirlos; el síntoma típico es un *permission denied* sobre
+`storage/logs/laravel.log` o `bootstrap/cache/config.php`.
+
+Tras cambiar el `.env`:
+
+```bash
+php artisan config:clear && php artisan config:cache
+```
+
 ## Estructura
 
 ```
