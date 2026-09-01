@@ -135,7 +135,12 @@ transmitió y lo compara contra lo que envía otro sistema:
 
 ```bash
 php artisan sat:inspeccionar-cuscar ruta/al/archivo.244
-php artisan sat:inspeccionar-cuscar ruta/al/archivo.244 --comparar=captura_legacy.txt
+
+# Comprueba que se transmite lo mismo que enviaría el sistema legacy
+php artisan sat:inspeccionar-cuscar ruta/al/archivo.244 --simular-legacy
+
+# O contra una captura real de otro sistema
+php artisan sat:inspeccionar-cuscar ruta/al/archivo.244 --comparar=captura.txt
 ```
 
 ## Estructura

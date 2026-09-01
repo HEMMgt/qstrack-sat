@@ -17,6 +17,7 @@ class InspeccionarCuscar extends Command
     protected $signature = 'sat:inspeccionar-cuscar
                             {ruta : Archivo cuscar a inspeccionar}
                             {--comparar= : Archivo con el contenido que envía otro sistema}
+                            {--simular-legacy : Compara contra lo que transmitiría el sistema legacy}
                             {--guardar= : Escribe en esta ruta el contenido que se transmitiría}';
 
     protected $description = 'Inspecciona un archivo cuscar y muestra qué se transmitiría a la SAT';
@@ -43,7 +44,17 @@ class InspeccionarCuscar extends Command
         }
 
         if ($comparar = $this->option('comparar')) {
-            return $this->comparar($transmitido, $comparar);
+            if (! is_readable($comparar)) {
+                $this->error("No se puede leer el archivo de comparación: {$comparar}");
+
+                return self::FAILURE;
+            }
+
+            return $this->comparar($transmitido, file_get_contents($comparar), basename($comparar));
+        }
+
+        if ($this->option('simular-legacy')) {
+            return $this->comparar($transmitido, $this->comoLegacy($crudo), 'legacy simulado');
         }
 
         return self::SUCCESS;
@@ -87,19 +98,25 @@ class InspeccionarCuscar extends Command
         $this->line('  Final:  <comment>'.$this->recortar(substr($transmitido, -60), 90).'</comment>');
     }
 
-    private function comparar(string $transmitido, string $rutaComparar): int
+    /**
+     * Reproduce lo que transmitiría el sistema legacy.
+     *
+     * Su envío lo hace el navegador: descarga el archivo, lo decodifica por su
+     * marca de orden de bytes y le aplica replace(/\n/g,""), que elimina los
+     * avances de línea y conserva los retornos de carro. El recorte de dos
+     * caracteres del legacy no se replica: solo se aplicaba en Firefox, y los
+     * envíos en producción se hacen desde Chrome.
+     */
+    private function comoLegacy(string $crudo): string
     {
-        if (! is_readable($rutaComparar)) {
-            $this->error("No se puede leer el archivo de comparación: {$rutaComparar}");
+        return str_replace("\n", '', CuscarContent::toPlainText($crudo));
+    }
 
-            return self::FAILURE;
-        }
-
-        $otro = file_get_contents($rutaComparar);
-
+    private function comparar(string $transmitido, string $otro, string $etiqueta): int
+    {
         $this->newLine();
-        $this->info('COMPARACIÓN');
-        $this->table(['', 'Este sistema', 'Capturado'], [
+        $this->info('COMPARACIÓN contra '.$etiqueta);
+        $this->table(['', 'Este sistema', $etiqueta], [
             ['Tamaño', number_format(strlen($transmitido)), number_format(strlen($otro))],
             ['Saltos CR', substr_count($transmitido, "\r"), substr_count($otro, "\r")],
             ['Saltos LF', substr_count($transmitido, "\n"), substr_count($otro, "\n")],
@@ -120,12 +137,12 @@ class InspeccionarCuscar extends Command
         $this->error("  DIFIEREN a partir del byte {$offset}");
         $this->newLine();
         $this->line('  Este sistema: '.$this->contexto($transmitido, $offset));
-        $this->line('  Capturado:    '.$this->contexto($otro, $offset));
+        $this->line("  {$etiqueta}: ".$this->contexto($otro, $offset));
         $this->newLine();
         $this->line('  Este sistema (hex): <comment>'.$this->hex(substr($transmitido, $offset, 16)).'</comment>');
-        $this->line('  Capturado (hex):    <comment>'.$this->hex(substr($otro, $offset, 16)).'</comment>');
+        $this->line("  {$etiqueta} (hex): <comment>".$this->hex(substr($otro, $offset, 16)).'</comment>');
 
-        $this->diferenciasDeCaracteres($transmitido, $otro);
+        $this->diferenciasDeCaracteres($transmitido, $otro, $etiqueta);
 
         return self::FAILURE;
     }
@@ -134,7 +151,7 @@ class InspeccionarCuscar extends Command
      * Resume qué caracteres sobran o faltan, que suele explicar la diferencia
      * mejor que el primer offset divergente.
      */
-    private function diferenciasDeCaracteres(string $a, string $b): void
+    private function diferenciasDeCaracteres(string $a, string $b, string $etiqueta = 'Otro'): void
     {
         $filas = [];
 
@@ -149,7 +166,7 @@ class InspeccionarCuscar extends Command
 
         if ($filas !== []) {
             $this->newLine();
-            $this->table(['Carácter', 'Este sistema', 'Capturado', 'Diferencia'], $filas);
+            $this->table(['Carácter', 'Este sistema', $etiqueta, 'Diferencia'], $filas);
         }
     }
 
