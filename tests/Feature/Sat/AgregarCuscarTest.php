@@ -379,3 +379,29 @@ it('transmite cuando ninguna credencial reclama ese emisor', function () {
 
     expect(CuscarFile::sole()->status)->toBe(CuscarStatus::Enviado);
 });
+
+it('transmite los acentos transliterados y la vista previa lo refleja', function () {
+    Http::fake([SatFake::url('ingresarCuscar') => Http::response(SatFake::exito())]);
+
+    $segmentos = "UNB+UNOA:2+7400000000926+7409000030025+20260901:0852+0001+6'\r\n"
+        ."FTX+AAA+++MATERIALES DIDÁCTICOS'\r\n"
+        ."UNZ+1+0001'\r\n";
+    $archivo = "\xFF\xFE".mb_convert_encoding($segmentos, 'UTF-16LE', 'UTF-8');
+
+    $user = operadorConGln('7400000000926');
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent('P0011234.123', $archivo),
+    ]);
+
+    // La pantalla de revisión muestra lo que de verdad se transmitirá.
+    $this->actingAs($user)
+        ->get(route('sat.cuscar.show', CuscarFile::sole()))
+        ->assertSee('MATERIALES DIDACTICOS')
+        ->assertDontSee('DIDÁCTICOS');
+
+    $this->actingAs($user)->post(route('sat.cuscar.send', CuscarFile::sole()));
+
+    Http::assertSent(fn ($request) => $request->url() === SatFake::url('ingresarCuscar')
+        && str_contains($request['contenidoArchivo'], "MATERIALES DIDACTICOS'")
+        && ! str_contains($request['contenidoArchivo'], 'Á'));
+});

@@ -150,6 +150,12 @@ por su cuenta dos transformaciones que aquí son explícitas.
    analizador cuenta esas líneas; sin ellas (o con CR sueltos) rechaza con
    errores de lexema y de segmento de cabecera. Configurable con
    `SAT_CUSCAR_NEWLINE_MODE` (`crlf`, `todos`, `ninguno`).
+3. **Acentos.** Se transliteran (`Á→A`, `Ñ→N`, …) antes de transmitir. La
+   sintaxis UNOA que declaran los archivos no los admite, y la SAT almacena el
+   contenido como Latin-1: una `Ó` enviada en UTF-8 queda registrada como `Ã“`
+   y así aparece en sus consultas y PDF — el legacy la envía tal cual y sufre
+   esa corrupción. Configurable con `SAT_CUSCAR_TRANSLITERAR` (activado por
+   omisión).
 
 Cuando la SAT rechace un archivo, este comando dice exactamente qué se le
 transmitió y lo compara contra lo que envía otro sistema:

@@ -24,7 +24,47 @@ final class CuscarContent
 
     public static function prepare(string $raw): string
     {
-        return self::normalizeNewlines(self::toPlainText($raw));
+        $content = self::toPlainText($raw);
+
+        if (config('sat.cuscar.transliterate')) {
+            $content = self::transliterate($content);
+        }
+
+        return self::normalizeNewlines($content);
+    }
+
+    /**
+     * Sustituye las letras acentuadas por su equivalente sin acento.
+     *
+     * Los archivos declaran sintaxis UNOA nivel A, que no admite acentos, y la
+     * SAT almacena el contenido como Latin-1: una Ó enviada en UTF-8 queda
+     * registrada como «Ã“» y así aparece en sus consultas y PDF. El legacy la
+     * envía tal cual y sufre esa misma corrupción; transmitir «O» deja el
+     * manifiesto legible. Lo que no tenga sustituto conocido viaja como «?»,
+     * que sí pertenece al juego UNOA.
+     */
+    public static function transliterate(string $content): string
+    {
+        if (mb_check_encoding($content, 'ASCII')) {
+            return $content;
+        }
+
+        $content = strtr($content, [
+            'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U',
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+            'À' => 'A', 'È' => 'E', 'Ì' => 'I', 'Ò' => 'O', 'Ù' => 'U',
+            'à' => 'a', 'è' => 'e', 'ì' => 'i', 'ò' => 'o', 'ù' => 'u',
+            'Ä' => 'A', 'Ë' => 'E', 'Ï' => 'I', 'Ö' => 'O', 'Ü' => 'U',
+            'ä' => 'a', 'ë' => 'e', 'ï' => 'i', 'ö' => 'o', 'ü' => 'u',
+            'Â' => 'A', 'Ê' => 'E', 'Î' => 'I', 'Ô' => 'O', 'Û' => 'U',
+            'â' => 'a', 'ê' => 'e', 'î' => 'i', 'ô' => 'o', 'û' => 'u',
+            'Ñ' => 'N', 'ñ' => 'n', 'Ç' => 'C', 'ç' => 'c',
+            'ª' => 'a', 'º' => 'o', '°' => 'o', '´' => "'", '’' => "'",
+            '“' => '"', '”' => '"', '–' => '-', '—' => '-',
+        ]);
+
+        // Cualquier otro carácter fuera de ASCII no tiene lugar en UNOA.
+        return preg_replace('/[^\x00-\x7F]/u', '?', $content) ?? $content;
     }
 
     /**

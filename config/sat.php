@@ -77,6 +77,10 @@ return [
         //   todos    quita CRLF, LF y CR, dejando los segmentos pegados.
         //   ninguno  transmite el archivo tal cual.
         'newline_mode' => env('SAT_CUSCAR_NEWLINE_MODE', 'crlf'),
+        // Sustituir acentos por su letra sin tilde antes de transmitir. La
+        // sintaxis UNOA de los archivos no los admite y la SAT los almacena
+        // corruptos (Ó enviada en UTF-8 aparece como «Ã“» en sus consultas).
+        'transliterate' => (bool) env('SAT_CUSCAR_TRANSLITERAR', true),
         'service_types' => ['P', 'E'],
         'procesamiento_sincrono' => env('SAT_PROCESAMIENTO_SINCRONO', false) ? 'true' : 'false',
         // La SAT no valida al instante; este es el tiempo que se le indica al

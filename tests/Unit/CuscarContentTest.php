@@ -96,3 +96,33 @@ it('transmite los mismos bytes que el sistema legacy', function () {
     expect(CuscarContent::prepare($archivo))->toBe($legacy)
         ->and($legacy)->toBe($segmentos);
 });
+
+it('sustituye los acentos por su letra sin tilde', function () {
+    // La sintaxis UNOA de los archivos no admite acentos, y la SAT almacena el
+    // contenido como Latin-1: una Ó enviada en UTF-8 aparece como «Ã“» en sus
+    // consultas y PDF. El legacy la envía tal cual y sufre esa corrupción.
+    expect(CuscarContent::prepare("FTX+AAA+++MATERIALES DIDÁCTICOS'"))
+        ->toBe("FTX+AAA+++MATERIALES DIDACTICOS'");
+
+    expect(CuscarContent::prepare("FTX+AAA+++COMPUTACIÓN Ñ AÑEJA über çédula'"))
+        ->toBe("FTX+AAA+++COMPUTACION N ANEJA uber cedula'");
+});
+
+it('convierte en interrogación lo que no tiene sustituto', function () {
+    expect(CuscarContent::prepare("FTX+AAA+++CAFÉ 100% 中文'"))
+        ->toBe("FTX+AAA+++CAFE 100% ??'");
+});
+
+it('puede desactivarse la transliteración', function () {
+    config()->set('sat.cuscar.transliterate', false);
+
+    expect(CuscarContent::prepare("FTX+AAA+++DIDÁCTICOS'"))
+        ->toBe("FTX+AAA+++DIDÁCTICOS'");
+});
+
+it('translitera también los acentos que vienen en UTF-16', function () {
+    $segmentos = "FTX+AAA+++AVIACIÓN'\r\n";
+    $archivo = "\xFF\xFE".mb_convert_encoding($segmentos, 'UTF-16LE', 'UTF-8');
+
+    expect(CuscarContent::prepare($archivo))->toBe("FTX+AAA+++AVIACION'\r\n");
+});

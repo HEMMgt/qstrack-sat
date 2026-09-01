@@ -54,7 +54,24 @@ class InspeccionarCuscar extends Command
         }
 
         if ($this->option('simular-legacy')) {
-            return $this->comparar($transmitido, $this->comoLegacy($crudo), 'legacy simulado');
+            $legacy = $this->comoLegacy($crudo);
+
+            // El legacy envía los acentos tal cual y la SAT los almacena
+            // corruptos; este sistema los translitera a propósito. Para que la
+            // comparación siga midiendo lo que importa (saltos y codificación),
+            // se aplica la misma sustitución a la simulación, avisándolo.
+            if (config('sat.cuscar.transliterate')) {
+                $transliterado = CuscarContent::transliterate($legacy);
+
+                if ($transliterado !== $legacy) {
+                    $this->newLine();
+                    $this->comment('  Nota: la simulación del legacy se transliteró igual que este sistema;');
+                    $this->comment('  el legacy envía los acentos tal cual y la SAT los almacena corruptos.');
+                    $legacy = $transliterado;
+                }
+            }
+
+            return $this->comparar($transmitido, $legacy, 'legacy simulado');
         }
 
         return self::SUCCESS;
