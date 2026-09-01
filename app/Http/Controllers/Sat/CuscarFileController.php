@@ -88,7 +88,10 @@ class CuscarFileController extends Controller
         $missing = ! $cuscar->exists();
 
         if (! $missing) {
-            $lines = preg_split('/\r\n|\n|\r/', $cuscar->contents()) ?: [];
+            // Se muestra ya normalizado: es lo que se transmitirá, no los bytes
+            // crudos, que pueden venir en UTF-16 y resultar ilegibles.
+            $texto = CuscarContent::toPlainText($cuscar->contents());
+            $lines = preg_split('/\r\n|\n|\r/', $texto) ?: [];
             $limit = (int) config('sat.cuscar.preview_lines');
             $preview = [
                 'lines' => array_slice($lines, 0, $limit),

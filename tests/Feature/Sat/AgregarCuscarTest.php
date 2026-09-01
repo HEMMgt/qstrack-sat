@@ -173,3 +173,42 @@ it('no guarda los archivos en una ruta accesible por el navegador', function () 
     expect(config('filesystems.disks.cuscar.root'))->not->toContain('/public')
         ->and(config('filesystems.disks.cuscar.visibility'))->toBe('private');
 });
+
+it('transmite en texto plano un cuscar que viene en UTF-16', function () {
+    Http::fake([SatFake::url('ingresarCuscar') => Http::response(SatFake::exito())]);
+
+    // Los sistemas de las navieras generan los cuscar en UTF-16 con marca de
+    // orden de bytes. Enviados tal cual, la SAT no puede leer el segmento BGM.
+    $segmentos = "UNB+UNOA:2+740000000926'\r\nBGM+785+09E26007084+9'\r\nUNZ+1+7084'";
+    $utf16 = "\xFF\xFE".mb_convert_encoding($segmentos, 'UTF-16LE', 'UTF-8');
+
+    $user = operadorCuscar();
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent('P0011234.123', $utf16),
+    ]);
+
+    $this->actingAs($user)->post(route('sat.cuscar.send', CuscarFile::sole()));
+
+    Http::assertSent(function ($request) {
+        $contenido = $request['contenidoArchivo'];
+
+        return str_starts_with($contenido, 'UNB+UNOA')
+            && str_contains($contenido, "BGM+785+09E26007084+9'")
+            && ! str_contains($contenido, "\x00")
+            && ! str_contains($contenido, "\xFF\xFE");
+    });
+});
+
+it('muestra la vista previa legible aunque el archivo sea UTF-16', function () {
+    $utf16 = "\xFF\xFE".mb_convert_encoding("UNB+UNOA:2'\r\nBGM+785+1+9'", 'UTF-16LE', 'UTF-8');
+
+    $user = operadorCuscar();
+    $this->actingAs($user)->post(route('sat.cuscar.store'), [
+        'archivo' => UploadedFile::fake()->createWithContent('P0011234.123', $utf16),
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('sat.cuscar.show', CuscarFile::sole()))
+        ->assertOk()
+        ->assertSee('BGM+785+1+9');
+});
